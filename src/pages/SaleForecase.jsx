@@ -1,6 +1,6 @@
 import { Box, Grid, Backdrop, Stack, Snackbar, TableContainer, TextField, Avatar, Typography, Button, Alert, Paper, Select, Menu, MenuItem, Table, TableHead, TableRow, TableCell, TableBody, IconButton, InputBase, CircularProgress, Divider, List, SpeedDial } from "@mui/material";
 import { useEffect, useState } from "react";
-import { ServiceGetCustomers, ServiceGetModels, ServiceGetPltype, ServiceGetSaleForecase, ServiceGetUser, ServiceSaveSaleForcase } from "../Service";
+import { API_DELETE_ALL_DATA, ServiceGetCustomers, ServiceGetModels, ServiceGetPltype, ServiceGetSaleForecase, ServiceGetUser, ServiceSaveSaleForcase } from "../Service";
 import moment from "moment";
 import parse from "paste-from-excel";
 import SaveIcon from '@mui/icons-material/Save';
@@ -41,6 +41,8 @@ function SealForecase() {
     const [message, setMessage] = useState('ทดสอบระบบ');
     const [openAppMenu, setOpenAppmenu] = useState(false);
     const [openSnackBar, setOpenSnackBar] = useState(false);
+    const [openSnackBarFalse, setOpenSnackBarFalse] = useState(false);
+
     const [model, setmodel] = useState([]);
     const [customer, setcustomer] = useState([]);
     const [pltype, setpltype] = useState([]);
@@ -62,7 +64,7 @@ function SealForecase() {
                 index === i
                     ? {
                         ...item,
-                        [elm]: (elm != 'modelCode' && elm != 'pltype' && elm != 'customer' && elm != 'sebango') ? (e.target.value != '' ? parseInt(e.target.value) : '') : e.target.value
+                        [elm]: (elm != 'modelCode' && elm != 'pltype' && elm != 'customer' && elm != 'sebango') ? (e.target.value != '' ? parseInt(e.target.value) : '') : (elm == 'customer' ? e.target.value.toUpperCase() : e.target.value)
                     }
                     : item
             )
@@ -71,7 +73,7 @@ function SealForecase() {
 
     async function init() {
         setLoading(true);
-        const res = await initialContent();
+        await initialContent();
         const resModel = await ServiceGetModels();
         const resCustomer = await ServiceGetCustomers();
         const resPltype = await ServiceGetPltype();
@@ -81,22 +83,24 @@ function SealForecase() {
         setLoading(false);
     }
 
-    const handleDeleteAll = () => {
-        var data = inputvalue.inputs;
-        data.map((item, index) => {
-            console.log(item)
-            Object.keys(item).map((el, ind) => {
-                data[index][el] = "";
+    async function handleDeleteAll() {
+        if (confirm('คุณต้องการลบรายการทั้งหมด ใช่หรือไม่')) {
+            var data = inputvalue.inputs;
+            data.map((item, index) => {
+                Object.keys(item).map((el, ind) => {
+                    data[index][el] = "";
+                })
             })
-        })
-        setinputvalue({ ...inputvalue, inputs: [...data] })
+            const delAll = await API_DELETE_ALL_DATA({ ym: `${yearSelected}${monthSelected.toLocaleString('en', { minimumIntegerDigits: 2 })}` });
+            console.log(delAll)
+            setinputvalue({ ...inputvalue, inputs: [...data] })
+        }
     }
     const initialContent = async () => {
         const saleforecase = await ServiceGetSaleForecase(`${yearSelected}${monthSelected.toLocaleString('en', {
             minimumIntegerDigits: 2,
             useGrouping: false
         })}`);
-        console.log(saleforecase)
         setDays([]);
         var initDays = [];
         var i = 0;
@@ -132,18 +136,41 @@ function SealForecase() {
         return (typeof val == 'undefined' || val == '' || obj.findIndex(el => el[key] == val) == -1) ? 1 : 0;
     }
 
+    const handleCheckSebango = (obj, key, val, modelCode) => {
+        let index = obj.findIndex(el => el[key] == val);
+        let sebango = '';
+        let err = 0;
+        if (modelCode != 'undefined' && modelCode != '') {
+            index = obj.findIndex(el => el['model'] == modelCode);
+            if (index != -1) {
+                sebango = model[index].modelCode;
+            } else {
+                err = 1;
+            }
+        } else {
+            sebango = "-";
+            err = 1;
+        }
+        return {
+            error: err,
+            sebango: sebango
+        };
+    }
+
     const handleSave = async () => {
         var data = []
         var empty = [];
         var checkPltype = true;
-        console.log(inputvalue.inputs)
+        setLoading(true);
         inputvalue.inputs.map((item, index) => {
             var row = inputvalue.inputs[index];
             var errors = [];
+            let checkSebango = handleCheckSebango(model, 'modelCode', row['sebango'], row['modelCode']);
             errors['customer'] = handleCheck(customer, 'customerNameShort', row['customer']);
             errors['modelCode'] = handleCheck(model, 'model', row['modelCode']);
             errors['pltype'] = handleCheck(pltype, 'pltype', row['pltype']);
-            errors['sebango'] = handleCheck(model, 'modelCode', row['sebango']);
+            errors['sebango'] = checkSebango.error;
+            inputvalue.inputs[index]['id'] = 0;
             if (typeof inputvalue.inputs[index]['modelCode'] != 'undefined' && inputvalue.inputs[index]['modelCode'] != '') {
                 if (inputvalue.inputs[index]['pltype'] == '' || typeof inputvalue.inputs[index]['pltype'] == 'undefined') {
                     setMessage('กรุณากรอกข้อมูล PLTYPE ')
@@ -151,8 +178,7 @@ function SealForecase() {
                     inputvalue.inputs[index]['warning'] = 1;
                     checkPltype = false;
                 }
-                console.log(inputvalue.inputs[index]['sebango'])
-                inputvalue.inputs[index]['sebango'] = inputvalue.inputs[index]['sebango'].toString();
+                inputvalue.inputs[index]['sebango'] = checkSebango.sebango;
                 inputvalue.inputs[index]['modelCode'] = inputvalue.inputs[index]['modelCode'];
                 inputvalue.inputs[index]['modelName'] = inputvalue.inputs[index]['modelCode'];
                 inputvalue.inputs[index]['ym'] = yearSelected + '' + monthSelected;
@@ -184,15 +210,13 @@ function SealForecase() {
             if (Object.values(el.error).includes(1)) {
                 validate = false;
             }
-            // console.log(el.error.filter(err=>{ console.log(err)}))
-            // if(el.error.filter(err=>err == 1)){
-
-            // }
         });
         if (validate == false) {
             setMessage('ข้อมูลของคุณยังไม่ถูกต้องตามที่ระบบต้องการ')
             setOpenMsg(1);
             setinputvalue({ ...inputvalue, inputs: [...data] })
+            setOpenSnackBarFalse({ ...openSnackBarFalse, msg: 'ข้อมูลของคุณยังไม่ถูกต้องตามที่ระบบต้องการ', status: true })
+            setLoading(false);
         } else {
             if (checkPltype != false) {
                 var canSave = true;
@@ -222,16 +246,20 @@ function SealForecase() {
                     if (save.status || (save.status == false && data.length == 0)) {
                         setMessage('บันทึกข้อมูลสำเร็จแล้ว ' + moment().format('DD/MM/YYYY HH:mm:ss'))
                         setOpenMsg(2);
-                        setinputvalue({ ...inputvalue, inputs: [...data, ...empty] })
+                        setinputvalue({ ...inputvalue, inputs: [...data, ...empty] });
                         setOpenSnackBar(true);
                     } else {
                         setMessage('เกิดข้อผิดพลาดกับข้อมูล กรุณาติดต่อ IT (250,611) เบียร์ ' + moment().format('DD/MM/YYYY HH:mm:ss'))
                         setOpenMsg(1);
-                    }
+                        setOpenSnackBarFalse({...openSnackBarFalse,status:true,msg:'เกิดข้อผิดพลาดกับข้อมูล กรุณาติดต่อ IT (250,611) เบียร์'})
+                    } 
+                    setLoading(false);
+                } else {
+                    setOpenSnackBar(true);
+                    setLoading(false);
                 }
             }
         }
-
     }
 
     const handleAddRow = () => {
@@ -280,7 +308,7 @@ function SealForecase() {
                     </Stack>
                 </div>
             </div>
-            <div className="h-[92.5%] p-3 bg-[#dbe2ed]">
+            <div className="h-[88%] p-3 bg-[#dbe2ed]">
                 <Paper className="h-[100%]">
                     <Stack direction={'row'} p={2} justifyContent={'space-between'}>
                         <Stack direction={'row'}>
@@ -329,23 +357,13 @@ function SealForecase() {
                         }
 
                         <table>
-                            {/* <tr>
-                                <th className="w-[40px]"></th>
-                                <th style={{
-                                    width: "250px",
-                                    border: "1px solid black"
-                                }} ></th>
-                                <th colSpan={days.length - 1} style={{ width: `${150 * days.length}px` }}>
-
-                                </th>
-                            </tr> */}
                             <tr className="text-center ">
                                 <th className="w-[40px] sticky top-0 bg-[#28aeed] shadow-md z-50 font-semibold border-black">#</th>
                                 {days.map((elm, ind) => {
                                     return (
                                         <th key={ind}
                                             style={{
-                                                width: elm == 'modelCode' ? '250px' : '150px'
+                                                width: elm == 'modelCode' ? '150px' : (elm == 'customer' ? '80px' : (elm == 'pltype' ? '120px' : '75px'))
                                             }}
                                             className="sticky top-0 bg-[#28aeed] shadow-md z-50 font-semibold border-black"
                                         >
@@ -356,10 +374,6 @@ function SealForecase() {
                             </tr>
                             {
                                 loading ? <tr><td colSpan={days.length + 1}>
-                                    {/* <Stack gap={1} p={3}>
-                                        <CircularProgress />
-                                        <Typography>กำลังโหลดข้อมูล ...</Typography>
-                                    </Stack> */}
                                 </td></tr> :
                                     inputvalue?.inputs?.map((res, index) => {
                                         return (
@@ -392,7 +406,8 @@ function SealForecase() {
                                                                 }}
                                                                 type={`${(elm == 'customer' || elm == 'modelCode' || elm == 'pltype' || elm == 'sebango') ? 'text' : 'number'}`}
                                                                 value={res[elm]}
-                                                                className={`w-full  ${checkAlert(res.error, elm)} ${res?.warning == 1 && 'bg-[#f8717145]'}`}
+                                                                disabled={elm == 'sebango' ? true : false}
+                                                                className={`w-full  ${checkAlert(res.error, elm)} ${res?.warning == 1 && 'bg-[#f8717145]'} ${elm == 'sebango' ? 'inpSebango' : ''}`}
                                                             />
                                                         </td>
                                                     );
@@ -452,6 +467,9 @@ function SealForecase() {
                 </Menu>
                 {/* <DialogViewUser open={openViewUser} close={setOpenViewUser} /> */}
             </div >
+            <div className="h-[4.5%] pl-3 flex items-center">
+                จำนวนแถวทั้งหมด : {inputvalue?.inputs?.length}
+            </div>
             <Backdrop
                 sx={{ color: '#fff', background: '#303030', zIndex: (theme) => theme.zIndex.drawer + 1 }}
                 open={loading}
@@ -466,6 +484,18 @@ function SealForecase() {
                     บันทึกข้อมูลสำเร็จแล้ว
                 </Alert>
             </Snackbar>
+
+
+            <Snackbar autoHideDuration={3000} anchorOrigin={{ vertical: "top", horizontal: "right" }} open={openSnackBarFalse.status} onClose={() => setOpenSnackBarFalse({ ...openSnackBarFalse, status: false })}>
+                <Alert onClose={() => setOpenSnackBarFalse({ ...openSnackBarFalse, status: false })} severity="error">
+                    {
+                        openSnackBarFalse.msg
+                    }
+
+                </Alert>
+            </Snackbar>
+
+
             <SpeedDial
                 title="ลบทั้งหมด"
                 onClick={() => handleDeleteAll()}

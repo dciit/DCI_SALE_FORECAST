@@ -56,3 +56,11 @@ export function ServiceGetPltype() {
     })
 }
 
+
+export function API_DELETE_ALL_DATA(param) {
+    return new Promise(resolve => {
+        http.post(`/saleforecase/deleteAll`,param).then((res) => {
+            resolve(res.data);
+        })
+    })
+}
