@@ -3,6 +3,7 @@ import Layout from "../pages/layout";
 import Page404 from "../pages/page404";
 import { useDispatch, useSelector } from "react-redux";
 import SealForecase from "../pages/SaleForecase";
+import Home from "../pages/Home";
 const Routers = () => {
     const dispatch = useDispatch();
     const BasePath = import.meta.env.VITE_PATH;
@@ -15,7 +16,8 @@ const Routers = () => {
         <BrowserRouter>
             <Routes>
                 <Route element={<Layout />}>
-                    <Route path={BasePath + '/'} element={<SealForecase />} />
+                    <Route path={BasePath + '/'} element={<Home />} />
+                    <Route path={BasePath + '/edit'} element={<SealForecase />} />
                 </Route>
                 <Route path="*" element={<Page404 />} />
             </Routes>

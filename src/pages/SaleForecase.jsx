@@ -1,6 +1,6 @@
 import { Box, Grid, Backdrop, Stack, Snackbar, TableContainer, TextField, Avatar, Typography, Button, Alert, Paper, Select, Menu, MenuItem, Table, TableHead, TableRow, TableCell, TableBody, IconButton, InputBase, CircularProgress, Divider, List, SpeedDial } from "@mui/material";
 import { useEffect, useState } from "react";
-import { API_DELETE_ALL_DATA, ServiceGetCustomers, ServiceGetModels, ServiceGetPltype, ServiceGetSaleForecase, ServiceGetUser, ServiceSaveSaleForcase } from "../Service";
+import { API_DELETE_ALL_DATA, API_GET_SALE_FORCAST, ServiceGetCustomers, ServiceGetModels, ServiceGetPltype, ServiceGetUser, API_SAVE_SALE_FORCAST, API_GET_SALE_OF_MONTH, API_UPDATE_ROW } from "../Service";
 import moment from "moment";
 import parse from "paste-from-excel";
 import SaveIcon from '@mui/icons-material/Save';
@@ -9,55 +9,119 @@ import AddCircleIcon from '@mui/icons-material/AddCircle';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useSelector } from 'react-redux';
 import { useDispatch } from 'react-redux';
-import logo from '../assets/icon-dci.png'
 import FilterListIcon from '@mui/icons-material/FilterList';
 import React from "react";
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Switch from '@mui/material/Switch';
+import Card from '@mui/material/Card';
+import TaskAltIcon from '@mui/icons-material/TaskAlt';
 function SealForecase() {
-
     // customer name , model name,sebango,pltype
-    const [anchorEl, setAnchorEl] = React.useState(null);
-    const open = Boolean(anchorEl);
-    const handleClick = (event) => {
-        setAnchorEl(event.currentTarget);
-    };
-    const handleClose = () => {
-        setAnchorEl(null);
-    };
+    const edit = useSelector(state => state.reducer.edit);
+    let month = edit.month;
+    let year = edit.year;
     const reducer = useSelector(state => state.reducer);
+    const reduxFilter = useSelector(state => state.reducer.filter);
     const dispatch = useDispatch();
     const empcode = reducer?.empcode;
     const [loading, setLoading] = useState(true);
-    const startDate = moment().format('YYYY-MM-01').toString();
-    const endDate = moment(moment().format('YYYY-MM-01').toString()).add(31, 'day').format('YYYY-MM-DD').toString();
     const [days, setDays] = useState([]);
     const [countRow, setCountRow] = useState(10);
     const [newRow, setNewRow] = useState(10);
     const [inputvalue, setinputvalue] = useState({});
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    const [monthSelected, setMonthSelected] = useState(moment().format('MM'));
-    const [yearSelected, setYearSelected] = useState(moment().format('YYYY'));
+    const [yearSelected, setYearSelected] = useState(typeof reduxFilter.year != 'undefined' ? reduxFilter.year : moment().format('YYYY'));
+    const [monthSelected, setMonthSelected] = useState(typeof reduxFilter.month != 'undefined' ? reduxFilter.month : moment().format('MM'));
+    const [startDate, setStartDate] = useState(moment().format('YYYY-MM-01').toString());
+    const [endDate, setEndDate] = useState(moment().endOf('month').format('YYYY-MM-DD'));
     const yearNow = moment().format('YYYY');
     const [openMsg, setOpenMsg] = useState(0);
     const [message, setMessage] = useState('ทดสอบระบบ');
     const [openAppMenu, setOpenAppmenu] = useState(false);
     const [openSnackBar, setOpenSnackBar] = useState(false);
     const [openSnackBarFalse, setOpenSnackBarFalse] = useState(false);
-
     const [model, setmodel] = useState([]);
     const [customer, setcustomer] = useState([]);
     const [pltype, setpltype] = useState([]);
+    const [svus, setSvus] = useState(["ALL", "1YC", "2YC", "SCR", "ODM"]);
+    const [svuSelected, setSvuSelected] = useState(svus[0]);
+    const [checkedEdit, setCheckEdit] = useState(false);
+    const [change, setChange] = useState(false);
     // const [loading, setLoading] = useState(true);
     const handlePaste = (index, elm, e, i) => {
+        setChange(true);
         return parse(e);
     };
 
+    async function handleUpdate() {
+        let listUpdate = await inputvalue.inputs.filter((item) => {
+            item['ym'] = `${year}${month.toLocaleString('en', { minimumIntegerDigits: 2 })}`;
+            [...Array(31)].map((v, num) => {
+                let day = num + 1;
+                let colDay = `d${day.toLocaleString('en', { minimumIntegerDigits: 2 })}`;
+                let valOfDay = (typeof item[colDay] != 'undefined' && item[colDay]) ? parseInt(item[colDay]) : 0;
+                item[colDay] = valOfDay;
+            })
+            return item;
+        });
+        listUpdate = await listUpdate.filter((item) => {
+            let iCustomer = (typeof item.customer != 'undefined' && item.customer != '') ? true : false;
+            let iModelCode = (typeof item.modelCode != 'undefined' && item.modelCode != '') ? true : false;
+            let iSebango = (typeof item.sebango != 'undefined' && item.sebango != '') ? true : false;
+            let iPlType = (typeof item.pltype != 'undefined' && item.pltype != '') ? true : false;
+            return typeof item.id == 'undefined' && iCustomer && iModelCode && iSebango && iPlType
+        });
+        if (listUpdate.length > 0) {
+            const update = await API_UPDATE_ROW({
+                year:year,
+                month:month,
+                listalforecast: listUpdate
+            });
+        }
+    }
+
+    async function handleChange(val, iRow, col) {
+        let row = inputvalue.inputs[iRow];
+        row[col] = (col == 'customer' || col == 'modelCode' || col == 'plType' || col == 'sebango') ? val : parseInt(val);
+        row['ym'] = `${year}${month.toLocaleString('en', { minimumIntegerDigits: 2 })}`;
+        // let canUpdate = true;
+        // if (col == 'customer') {
+        //     let haveCustomer = customer.filter(item => item.customerNameShort == val);
+        //     if (Object.keys(haveCustomer).length == 0) {
+        //         canUpdate = false;
+        //     }
+        // }
+        // if (col == 'modelCode' && canUpdate == true) {
+        //     let haveModel = model.filter(item => item.model == val);
+        //     if (Object.keys(haveModel).length == 0) {
+        //         canUpdate = false;
+        //     }
+        // }
+        [...Array(31)].map((item, index) => {
+            let day = index + 1;
+            let colDay = `d${day.toLocaleString('en', { minimumIntegerDigits: 2 })}`;
+            let valOfDay = (typeof row[colDay] != 'undefined' && row[colDay]) ? parseInt(row[colDay]) : 0;
+            row[colDay] = valOfDay;
+        })
+        // if (canUpdate) {
+        //     const update = await API_UPDATE_ROW({
+        //         id: row.id,
+        //         column: col,
+        //         val: parseInt(val),
+        //         alforecast: row
+        //     });
+        //     console.log(update)
+        //     if(update?.status > 0){
+        //         row['id'] = update.id;
+        //     }
+        // }
+    }
     const handleLogout = () => {
         if (confirm('คุณต้องการออกจากระบบใช่หรือไม่ ?')) {
             dispatch({ type: 'LOGIN', payload: { login: false } })
         }
     }
-
-    const handlePaste1 = (index, elm, e, i) => {
+    const handlePasteRun = (index, elm, e, i) => {
         setinputvalue((inputvalue) => ({
             ...inputvalue,
             inputs: inputvalue.inputs.map((item, i) =>
@@ -70,7 +134,6 @@ function SealForecase() {
             )
         }));
     };
-
     async function init() {
         setLoading(true);
         await initialContent();
@@ -82,6 +145,10 @@ function SealForecase() {
         setpltype(resPltype);
         setLoading(false);
     }
+    async function getData() {
+        const res = await API_GET_SALE_OF_MONTH({ year: year, month: month });
+        console.log(res);
+    }
 
     async function handleDeleteAll() {
         if (confirm('คุณต้องการลบรายการทั้งหมด ใช่หรือไม่')) {
@@ -91,21 +158,26 @@ function SealForecase() {
                     data[index][el] = "";
                 })
             })
-            const delAll = await API_DELETE_ALL_DATA({ ym: `${yearSelected}${monthSelected.toLocaleString('en', { minimumIntegerDigits: 2 })}` });
-            console.log(delAll)
+            const delAll = await API_DELETE_ALL_DATA({ ym: `${year}${month.toLocaleString('en', { minimumIntegerDigits: 2 })}` });
             setinputvalue({ ...inputvalue, inputs: [...data] })
         }
     }
     const initialContent = async () => {
-        const saleforecase = await ServiceGetSaleForecase(`${yearSelected}${monthSelected.toLocaleString('en', {
-            minimumIntegerDigits: 2,
-            useGrouping: false
-        })}`);
+        let rowCount = 0;
+        const saleforecase = await API_GET_SALE_OF_MONTH({
+            year: year,
+            month: month
+        });
+        rowCount = countRow;
+        if (saleforecase.length > 10 && rowCount < saleforecase.length) {
+            rowCount = saleforecase.length
+            setCountRow(rowCount)
+        }
         setDays([]);
         var initDays = [];
         var i = 0;
         var input = { inputs: [] };
-        while (i < (saleforecase.length < countRow ? countRow : saleforecase.length)) {
+        while (i < rowCount) {
             var colInput = {};
             var a = moment(startDate);
             var b = moment(endDate);
@@ -114,7 +186,7 @@ function SealForecase() {
             initDays.push('modelCode');
             initDays.push('sebango')
             initDays.push('pltype');
-            for (var m = moment(a); m.isBefore(b); m.add(1, 'days')) {
+            for (var m = moment(a); m <= b; m.add(1, 'days')) {
                 initDays.push('d' + m.format('DD'));
             }
             if (typeof saleforecase[i] !== 'undefined') {
@@ -131,11 +203,9 @@ function SealForecase() {
         setinputvalue({ ...input })
         setDays([...initDays]);
     }
-
     const handleCheck = (obj, key, val) => {
         return (typeof val == 'undefined' || val == '' || obj.findIndex(el => el[key] == val) == -1) ? 1 : 0;
     }
-
     const handleCheckSebango = (obj, key, val, modelCode) => {
         let index = obj.findIndex(el => el[key] == val);
         let sebango = '';
@@ -156,7 +226,6 @@ function SealForecase() {
             sebango: sebango
         };
     }
-
     const handleSave = async () => {
         var data = []
         var empty = [];
@@ -240,19 +309,22 @@ function SealForecase() {
                     indexRow++;
                 })
                 if (canSave) {
-                    const save = await ServiceSaveSaleForcase({ data: data, ym: `${yearSelected}${monthSelected.toLocaleString('en', { minimumIntegerDigits: 2 })}` }).then((res) => {
-                        return res
-                    });
-                    if (save.status || (save.status == false && data.length == 0)) {
-                        setMessage('บันทึกข้อมูลสำเร็จแล้ว ' + moment().format('DD/MM/YYYY HH:mm:ss'))
-                        setOpenMsg(2);
-                        setinputvalue({ ...inputvalue, inputs: [...data, ...empty] });
-                        setOpenSnackBar(true);
-                    } else {
-                        setMessage('เกิดข้อผิดพลาดกับข้อมูล กรุณาติดต่อ IT (250,611) เบียร์ ' + moment().format('DD/MM/YYYY HH:mm:ss'))
-                        setOpenMsg(1);
-                        setOpenSnackBarFalse({...openSnackBarFalse,status:true,msg:'เกิดข้อผิดพลาดกับข้อมูล กรุณาติดต่อ IT (250,611) เบียร์'})
-                    } 
+                    console.log(data)
+                    // const save = await API_SAVE_SALE_FORCAST({ data: data, ym: `${year}${month.toLocaleString('en', { minimumIntegerDigits: 2 })}` });
+                    // console.log(save);
+                    // const save = await API_SAVE_SALE_FORCAST({ data: data, ym: `${yearSelected}${monthSelected.toLocaleString('en', { minimumIntegerDigits: 2 })}` }).then((res) => {
+                    //     return res
+                    // });
+                    // if (save.status || (save.status == false && data.length == 0)) {
+                    //     setMessage('บันทึกข้อมูลสำเร็จแล้ว ' + moment().format('DD/MM/YYYY HH:mm:ss'))
+                    //     setOpenMsg(2);
+                    //     setinputvalue({ ...inputvalue, inputs: [...data, ...empty] });
+                    //     setOpenSnackBar(true);
+                    // } else {
+                    //     setMessage('เกิดข้อผิดพลาดกับข้อมูล กรุณาติดต่อ IT (250,611) เบียร์ ' + moment().format('DD/MM/YYYY HH:mm:ss'))
+                    //     setOpenMsg(1);
+                    //     setOpenSnackBarFalse({ ...openSnackBarFalse, status: true, msg: 'เกิดข้อผิดพลาดกับข้อมูล กรุณาติดต่อ IT (250,611) เบียร์' })
+                    // }
                     setLoading(false);
                 } else {
                     setOpenSnackBar(true);
@@ -261,9 +333,8 @@ function SealForecase() {
             }
         }
     }
-
     const handleAddRow = () => {
-        var count = parseInt(countRow) + parseInt(newRow);
+        let count = parseInt(countRow) + parseInt(newRow);
         setCountRow(count);
     }
     const handleDelete = (index) => {
@@ -279,75 +350,113 @@ function SealForecase() {
         return (typeof data != 'undefined' && typeof data[index] != 'undefined' && data[index] == 1) ? 'bg-red-300' : '';
     }
     useEffect(() => {
-        init();
-    }, [countRow, monthSelected, yearSelected]);
+        if (change) {
+            setTimeout(() => {
+                // handleSave();
+                handleUpdate();
+                setChange(false);
+            }, 1500);
+        } else {
+            init();
+        }
+        return;
+    }, [change,countRow]);
     return (
         <div className="h-full w-full">
-            <div className="bg-[#fff] h-[7.5%] flex items-center pl-[16px] font-semibold text-[2em] text-white justify-between appbar">
-                <div>
-                    <Stack direction={'row'} gap={1} alignItems={'center'}>
-                        <img src={logo} className="w-[35px] h-[35px]" />
-                        <span className="text-black">DCI Sale Forecase Month</span>
-                    </Stack>
-                </div>
-                <div>
-                    <Stack direction={'row'} alignItems={'center'} spacing={0} onClick={() => setAnchorEl(true)} className="cursor-pointer">
-                        <Typography className="text-black">{reducer.name}</Typography>
-                        <IconButton
-                            size="large"
-                            aria-label="account of current user"
-                            onClick={handleClick}
-                            sx={{ ml: 2 }}
-                            aria-controls={open ? 'account-menu' : undefined}
-                            aria-haspopup="true"
-                            aria-expanded={open ? 'true' : undefined}
-                            color="inherit"
-                        >
-                            <Avatar src={`http://dcihrm.dci.daikin.co.jp/PICTURE/${reducer.empcode}.JPG`}> </Avatar>
-                        </IconButton>
-                    </Stack>
-                </div>
-            </div>
             <div className="h-[88%] p-3 bg-[#dbe2ed]">
                 <Paper className="h-[100%]">
                     <Stack direction={'row'} p={2} justifyContent={'space-between'}>
                         <Stack direction={'row'}>
-                            <Stack direction={'row'} alignItems={'center'} gap={1}>
-                                <FilterListIcon style={{ color: '#65a0f5' }} />
-                                <span>Filter Sale</span>
-                            </Stack>
-                            <div className="flex gap-1 items-center pl-3">
-                                <span>Month : </span>
-                                <Select size="small" value={monthSelected} onChange={(e) => {
-                                    handleClear();
-                                    setMonthSelected(e.target.value)
-                                }}>
-                                    {
-                                        monthNames.map((month, index) => (
-                                            <MenuItem value={(index + 1)} key={(index + 1)}>{month}</MenuItem>
-                                        ))
-                                    }
-                                </Select>
-                                <span>Year : </span>
-                                <Select size="small" value={yearSelected} onChange={(e) => {
-                                    handleClear();
-                                    setYearSelected(e.target.value)
-                                }}>
-                                    {
-                                        [...Array(3)].map((year, index) => {
-                                            return <MenuItem value={parseInt(yearNow) + index} key={index}>{parseInt(yearNow) + index}</MenuItem>
+                            <Stack direction={'row'} alignItems={'center'} gap={2}>
+                                {/* <Stack direction={'row'} alignItems={'center'} gap={1}>
+                                    <FilterListIcon style={{ color: '#65a0f5' }} />
+                                    <span>Filter</span>
+                                </Stack> */}
+                                <Stack direction={'row'}>
+                                    <Typography>YEAR : {year}</Typography>
+                                </Stack>
+                                <Stack direction={'row'}>
+                                    <Typography>MONTH : {moment().month(month - 1).format('MMM').toUpperCase()}</Typography>
+                                </Stack>
+
+                                {/* <Stack direction={'row'} alignItems={'center'} gap={1}> */}
+                                {/* <Typography>Month : </Typography> */}
+                                {/* <Select size="small" value={monthSelected} onChange={(e) => {
+                                        let month = e.target.value;
+                                        month = parseInt(month) >= 10 ? month : `0${month}`;
+                                        dispatch({
+                                            type: 'SET_FILTER', payload: {
+                                                filter: {
+                                                    year: yearSelected,
+                                                    month: month
+                                                }
+                                            }
                                         })
-                                    }
-                                </Select>
-                            </div>
+                                        setStartDate(`${yearSelected}${month}01`);
+                                        setEndDate(`${yearSelected}${month}${moment(`${yearSelected}${month}`, 'YYYYMM').daysInMonth()}`);
+                                        handleClear();
+                                        setMonthSelected(e.target.value)
+                                    }}>
+                                        {
+                                            monthNames.map((month, index) => (
+                                                <MenuItem value={(index + 1)} key={(index + 1)}>{month}</MenuItem>
+                                            ))
+                                        }
+                                    </Select> */}
+                                {/* </Stack> */}
+                                {/* <Stack direction={'row'} alignItems={'center'} gap={1}>
+                                    <Typography>Year : </Typography>
+                                    <Select size="small" value={yearSelected} onChange={(e) => {
+                                        dispatch({
+                                            type: 'SET_FILTER', payload: {
+                                                filter: {
+                                                    year: e.target.value,
+                                                    month: monthSelected
+                                                }
+                                            }
+                                        })
+                                        handleClear();
+                                        setYearSelected(e.target.value)
+                                    }}>
+                                        {
+                                            [...Array(3)].map((year, index) => {
+                                                return <MenuItem value={parseInt(yearNow) + index} key={index}>{parseInt(yearNow) + index}</MenuItem>
+                                            })
+                                        }
+                                    </Select>
+                                </Stack> */}
+                                {/* <Stack direction={'row'} alignItems={'center'} gap={1}>
+                                    <Typography>SVU : </Typography>
+                                    <Select size="small" value={svuSelected} onChange={(e) => {
+                                        setSvuSelected(e.target.value)
+                                    }}>
+                                        {
+                                            svus.map((item, index) => {
+                                                return <MenuItem value={item} key={index}>{item}</MenuItem>
+                                            })
+                                        }
+                                    </Select>
+                                </Stack> */}
+                            </Stack>
                         </Stack>
                         <Stack direction={'row'} alignItems={'center'} gap={1}>
                             <TextField type="number" value={newRow} size="small" onChange={(e) => {
                                 setNewRow(e.target.value)
                             }} />
                             <Button variant='contained' onClick={() => handleAddRow()} startIcon={<AddCircleIcon />}> เพิ่มแถว </Button>
-                            <Button variant='contained' onClick={() => handleSave()} startIcon={<SaveIcon />} color="success"> บันทึก</Button>
                         </Stack>
+                    </Stack>
+                    <Stack direction={'row'} alignItems={'start'} px={2} pt={0} pb={2} gap={2}>
+                        <Card className="px-3 py-3 h-[65px] flex justify-center items-center gap-2" >
+                            <Typography>เวอร์ชั่น </Typography>
+                            <Typography variant="button" className="text-[1.5rem] font-semibold text-red-500"> 1.0</Typography>
+                        </Card>
+                        <Card className="pl-3 pr-6 py-3 h-[65px] flex items-center" >
+                            <Stack direction={'row'} gap={2}>
+                                {/* <Button variant='contained' startIcon={<TaskAltIcon />} > แก้ไข</Button> */}
+                                <Button variant='contained' color="success" onClick={() => handleSave()} startIcon={<TaskAltIcon />} > แจกจ่าย</Button>
+                            </Stack>
+                        </Card>
                     </Stack>
                     <div className="wrapper">
                         {
@@ -355,122 +464,76 @@ function SealForecase() {
                                 <Alert severity={`${openMsg == 2 ? 'success' : 'error'}`}>{message}</Alert>
                             </div>
                         }
-
                         <table>
-                            <tr className="text-center ">
-                                <th className="w-[40px] sticky top-0 bg-[#28aeed] shadow-md z-50 font-semibold border-black">#</th>
-                                {days.map((elm, ind) => {
-                                    return (
-                                        <th key={ind}
-                                            style={{
-                                                width: elm == 'modelCode' ? '150px' : (elm == 'customer' ? '80px' : (elm == 'pltype' ? '120px' : '75px'))
-                                            }}
-                                            className="sticky top-0 bg-[#28aeed] shadow-md z-50 font-semibold border-black"
-                                        >
-                                            <Typography className="capitalize">{elm}</Typography>
-                                        </th>
-                                    );
-                                })}
-                            </tr>
-                            {
-                                loading ? <tr><td colSpan={days.length + 1}>
-                                </td></tr> :
-                                    inputvalue?.inputs?.map((res, index) => {
+                            <tbody>
+                                <tr className="text-center ">
+                                    <th className="w-[40px] sticky top-0 bg-[#28aeed] shadow-md z-50 font-semibold border-black">#</th>
+                                    {days.map((elm, ind) => {
                                         return (
-                                            <tr key={index} >
-                                                <td className="text-center" >
-                                                    <div className="flex p-0 justify-center">
-                                                        <IconButton className="p-0 hover:text-red-500" onClick={() => handleDelete(index)}><DeleteIcon /></IconButton>
-                                                    </div>
-                                                </td>
-                                                {days.map((elm, i) => {
-                                                    return (
-                                                        <td
-                                                            className={elm == 'modelCode' && 'sticky'}
-                                                            key={i}
-                                                            style={{
-                                                                minHeight: "30px",
-                                                                border: "1px solid black",
-                                                                borderRadius: "0px",
-                                                                wordWrap: "break-word"
-                                                            }}
-                                                        >
-                                                            <input
-                                                                title="saddasd"
-                                                                size="small"
-                                                                onInput={(e) => {
-                                                                    handlePaste1(index, elm, e, i);
-                                                                }}
-                                                                onPaste={(e) => {
-                                                                    handlePaste(index, elm, e, i);
-                                                                }}
-                                                                type={`${(elm == 'customer' || elm == 'modelCode' || elm == 'pltype' || elm == 'sebango') ? 'text' : 'number'}`}
-                                                                value={res[elm]}
-                                                                disabled={elm == 'sebango' ? true : false}
-                                                                className={`w-full  ${checkAlert(res.error, elm)} ${res?.warning == 1 && 'bg-[#f8717145]'} ${elm == 'sebango' ? 'inpSebango' : ''}`}
-                                                            />
-                                                        </td>
-                                                    );
-                                                })}
-                                            </tr>
+                                            <th key={ind}
+                                                style={{
+                                                    width: elm == 'modelCode' ? '150px' : (elm == 'customer' ? '80px' : (elm == 'pltype' ? '120px' : '75px'))
+                                                }}
+                                                className="sticky top-0 bg-[#28aeed] shadow-md z-50 font-semibold border-black"
+                                            >
+                                                <Typography className="capitalize">{elm}</Typography>
+                                            </th>
                                         );
                                     })}
+                                </tr>
+                                {
+                                    loading ? <tr><td colSpan={days.length + 1}>
+                                    </td></tr> :
+                                        inputvalue?.inputs?.map((res, index) => {
+                                            return (
+                                                <tr key={index} >
+                                                    <td className="text-center" >
+                                                        <div className="flex p-0 justify-center">
+                                                            <IconButton className="p-0 hover:text-red-500" onClick={() => handleDelete(index)}><DeleteIcon /></IconButton>
+                                                        </div>
+                                                    </td>
+                                                    {
+                                                        days.map((elm, i) => {
+                                                            return (
+                                                                <td
+                                                                    className={elm == 'modelCode' ? 'sticky' : ''}
+                                                                    key={i}
+                                                                    style={{
+                                                                        minHeight: "30px",
+                                                                        border: "1px solid black",
+                                                                        borderRadius: "0px",
+                                                                        wordWrap: "break-word"
+                                                                    }}
+                                                                >
+                                                                    <input
+                                                                        size="small"
+                                                                        onInput={(e) => {
+                                                                            handlePasteRun(index, elm, e, i);
+                                                                        }}
+                                                                        onPaste={(e) => {
+                                                                            handlePaste(index, elm, e, i);
+                                                                        }}
+                                                                        onChange={(e) => {
+                                                                            handleChange(e.target.value, index, elm)
+                                                                        }}
+                                                                        type={`${(elm == 'customer' || elm == 'modelCode' || elm == 'pltype' || elm == 'sebango') ? 'text' : 'number'}`}
+                                                                        value={res[elm]}
+                                                                        disabled={elm == 'sebango' ? true : false}
+                                                                        className={`w-full  ${checkAlert(res.error, elm)} ${res?.warning == 1 && 'bg-[#f8717145]'} ${elm == 'sebango' ? 'inpSebango' : ''}`}
+                                                                    />
+                                                                </td>
+                                                            );
+                                                        })}
+                                                </tr>
+                                            );
+                                        })}
+                            </tbody>
                         </table>
                     </div>
                 </Paper>
-                <Menu
-                    anchorEl={anchorEl}
-                    id="account-menu"
-                    open={open}
-                    onClose={handleClose}
-                    onClick={handleClose}
-                    anchorOrigin={{
-                        vertical: 'top',
-                        horizontal: 'right',
-                    }}
-                    keepMounted
-                    transformOrigin={{
-                        vertical: 'top',
-                        horizontal: 'right',
-                    }}
-                    PaperProps={{
-                        elevation: 0,
-                        sx: {
-                            overflow: 'visible',
-                            filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
-                            mt: 1.5,
-                            '& .MuiAvatar-root': {
-                                width: 32,
-                                height: 32,
-                                ml: -0.5,
-                                mr: 1,
-                            },
-                            '&:before': {
-                                content: '""',
-                                display: 'block',
-                                position: 'absolute',
-                                top: 0,
-                                right: 14,
-                                width: 10,
-                                height: 10,
-                                bgcolor: 'background.paper',
-                                transform: 'translateY(-50%) rotate(45deg)',
-                                zIndex: 0,
-                            },
-                        },
-                    }}
-                >
-                    <MenuItem onClick={() => {
-                        handleLogout()
-                        setOpenAppmenu(false)
-                    }}>ออกจากระบบ</MenuItem>
-                </Menu>
-                {/* <DialogViewUser open={openViewUser} close={setOpenViewUser} /> */}
             </div >
-            <div className="h-[4.5%] pl-3 flex items-center">
-                จำนวนแถวทั้งหมด : {inputvalue?.inputs?.length}
-            </div>
             <Backdrop
+                className="select-none"
                 sx={{ color: '#fff', background: '#303030', zIndex: (theme) => theme.zIndex.drawer + 1 }}
                 open={loading}
             >
@@ -484,18 +547,13 @@ function SealForecase() {
                     บันทึกข้อมูลสำเร็จแล้ว
                 </Alert>
             </Snackbar>
-
-
             <Snackbar autoHideDuration={3000} anchorOrigin={{ vertical: "top", horizontal: "right" }} open={openSnackBarFalse.status} onClose={() => setOpenSnackBarFalse({ ...openSnackBarFalse, status: false })}>
                 <Alert onClose={() => setOpenSnackBarFalse({ ...openSnackBarFalse, status: false })} severity="error">
                     {
                         openSnackBarFalse.msg
                     }
-
                 </Alert>
             </Snackbar>
-
-
             <SpeedDial
                 title="ลบทั้งหมด"
                 onClick={() => handleDeleteAll()}
@@ -505,7 +563,6 @@ function SealForecase() {
             >
             </SpeedDial>
         </div >
-
     );
 }
 export default SealForecase;

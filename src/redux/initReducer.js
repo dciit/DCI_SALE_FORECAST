@@ -2,20 +2,38 @@ const initialState = {
     login: false,
     name: '',
     username: '',
-    empcode:'',
+    empcode: '',
     filter: {
-        evaluate: {
-            supplier: '',
-            year: '',
-            month: ''
-        }
+        year: '',
+        month: ''
     },
     version: 0,
-    objectselected: null
+    objectselected: null,
+    edit: {
+        year: 0,
+        month: 0
+    }
 }
 
 const IndexReducer = (state = initialState, action) => {
     switch (action.type) {
+        case 'SET_EDIT':
+            console.log(action.payload)
+            return {
+                ...state,
+                edit: {
+                    year: action.payload.year,
+                    month: action.payload.month
+                }
+            }
+        case 'SET_FILTER':
+            return {
+                ...state,
+                filter: {
+                    year: action.payload.filter.year,
+                    month: action.payload.filter.month
+                }
+            }
         case 'LOGIN':
             return {
                 ...state,
