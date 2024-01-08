@@ -10,11 +10,11 @@ function Layout() {
     const reducer = useSelector(state => state.reducer);
     return <>
         {
-            reducer?.login ? <Stack>
+            reducer?.login ? <Stack className="h-[100%]">
                 <ToolbarComponent />
-                <BreadcrumbsComponent/>
+                {/* <BreadcrumbsComponent/> */}
                 <Outlet />
-                <FooterComponent/>
+                {/* <FooterComponent/> */}
             </Stack> : <Login />
         }
     </>

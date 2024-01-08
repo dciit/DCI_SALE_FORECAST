@@ -6,6 +6,7 @@
     font-family: 'Lato';
     src: local('Lato'), url('./fonts/Lato.ttf') format('woff');
 }
+
 @font-face {
     font-family: 'Lato-Bold';
     src: local('Lato-Bold'), url('./fonts/Lato-Bold.ttf') format('woff');
@@ -36,17 +37,19 @@ table {
     table-layout: fixed;
     background-color: white;
 }
+
 table {
     width: 100%;
     border-collapse: collapse;
 }
+
 .wrapper {
     position: relative;
     background-color: white;
     width: 100%;
-    height: 92.5%;
+    height: 100%;
     overflow-x: scroll;
-    padding:8px;
+    padding: 8px;
 }
 
 .appbar {
@@ -56,21 +59,39 @@ table {
 table td:first-child {
     background: #e9e9e9 !important;
 }
+
 table input {
     font-weight: bold !important;
 }
+
 .box-alert {
     position: absolute;
     bottom: 18px;
     right: 32px;
     z-index: 99;
 }
-
 .sticky {
     position: sticky;
     left: 0;
 }
-
 .inpSebango {
-    background:#ddd;
+    background: #ddd;
+}
+table .Spreadsheet__header {
+    color:rgb(54, 54, 54);
+}
+table .Spreadsheet__header:first-child {
+    width: 50px !important;
+}
+table .Spreadsheet__header:nth-child(3) {
+    width: 175px !important;
+}
+table .Spreadsheet__header:nth-child(5) {
+    width: 150px !important;
+}
+table .Spreadsheet__header:nth-child(-n+5) {
+    width: 80px;
+}
+table .Spreadsheet__header:nth-child(n+6) {
+    width: 75px;
 }

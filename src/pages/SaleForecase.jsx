@@ -1,6 +1,6 @@
 import { Box, Grid, Backdrop, Stack, Snackbar, TableContainer, TextField, Avatar, Typography, Button, Alert, Paper, Select, Menu, MenuItem, Table, TableHead, TableRow, TableCell, TableBody, IconButton, InputBase, CircularProgress, Divider, List, SpeedDial } from "@mui/material";
 import { useEffect, useState } from "react";
-import { API_DELETE_ALL_DATA, API_GET_SALE_FORCAST, ServiceGetCustomers, ServiceGetModels, ServiceGetPltype, ServiceGetUser, API_SAVE_SALE_FORCAST, API_GET_SALE_OF_MONTH, API_UPDATE_ROW } from "../Service";
+import { API_DELETE_ALL_DATA, API_GET_SALE_FORCAST, ServiceGetCustomers, ServiceGetModels, ServiceGetPltype, ServiceGetUser, API_SAVE_SALE_FORCAST, API_GET_SALE_OF_MONTH, API_UPDATE_ROW, API_GET_SALE } from "../Service";
 import moment from "moment";
 import parse from "paste-from-excel";
 import SaveIcon from '@mui/icons-material/Save';
@@ -9,12 +9,10 @@ import AddCircleIcon from '@mui/icons-material/AddCircle';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useSelector } from 'react-redux';
 import { useDispatch } from 'react-redux';
-import FilterListIcon from '@mui/icons-material/FilterList';
 import React from "react";
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Switch from '@mui/material/Switch';
 import Card from '@mui/material/Card';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
+import ExcelPanel from "../components/ExcelComponent";
 function SealForecase() {
     // customer name , model name,sebango,pltype
     const edit = useSelector(state => state.reducer.edit);
@@ -24,12 +22,12 @@ function SealForecase() {
     const reduxFilter = useSelector(state => state.reducer.filter);
     const dispatch = useDispatch();
     const empcode = reducer?.empcode;
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [days, setDays] = useState([]);
     const [countRow, setCountRow] = useState(10);
     const [newRow, setNewRow] = useState(10);
     const [inputvalue, setinputvalue] = useState({});
-    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    // const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const [yearSelected, setYearSelected] = useState(typeof reduxFilter.year != 'undefined' ? reduxFilter.year : moment().format('YYYY'));
     const [monthSelected, setMonthSelected] = useState(typeof reduxFilter.month != 'undefined' ? reduxFilter.month : moment().format('MM'));
     const [startDate, setStartDate] = useState(moment().format('YYYY-MM-01').toString());
@@ -37,7 +35,6 @@ function SealForecase() {
     const yearNow = moment().format('YYYY');
     const [openMsg, setOpenMsg] = useState(0);
     const [message, setMessage] = useState('ทดสอบระบบ');
-    const [openAppMenu, setOpenAppmenu] = useState(false);
     const [openSnackBar, setOpenSnackBar] = useState(false);
     const [openSnackBarFalse, setOpenSnackBarFalse] = useState(false);
     const [model, setmodel] = useState([]);
@@ -47,6 +44,7 @@ function SealForecase() {
     const [svuSelected, setSvuSelected] = useState(svus[0]);
     const [checkedEdit, setCheckEdit] = useState(false);
     const [change, setChange] = useState(false);
+    const [excel, setExcel] = useState([]);
     // const [loading, setLoading] = useState(true);
     const handlePaste = (index, elm, e, i) => {
         setChange(true);
@@ -69,53 +67,57 @@ function SealForecase() {
             let iModelCode = (typeof item.modelCode != 'undefined' && item.modelCode != '') ? true : false;
             let iSebango = (typeof item.sebango != 'undefined' && item.sebango != '') ? true : false;
             let iPlType = (typeof item.pltype != 'undefined' && item.pltype != '') ? true : false;
-            return typeof item.id == 'undefined' && iCustomer && iModelCode && iSebango && iPlType
+            return (typeof item.id == 'undefined' && iCustomer && iModelCode && iSebango && iPlType) || (typeof item.id != 'undefined' && iCustomer && iModelCode && iSebango && iPlType)
         });
         if (listUpdate.length > 0) {
+            console.log(listUpdate)
             const update = await API_UPDATE_ROW({
-                year:year,
-                month:month,
+                year: year,
+                month: month,
                 listalforecast: listUpdate
             });
+            if (update.status > 0) {
+                setinputvalue({ inputs: listUpdate })
+            }
         }
     }
 
-    async function handleChange(val, iRow, col) {
-        let row = inputvalue.inputs[iRow];
-        row[col] = (col == 'customer' || col == 'modelCode' || col == 'plType' || col == 'sebango') ? val : parseInt(val);
-        row['ym'] = `${year}${month.toLocaleString('en', { minimumIntegerDigits: 2 })}`;
-        // let canUpdate = true;
-        // if (col == 'customer') {
-        //     let haveCustomer = customer.filter(item => item.customerNameShort == val);
-        //     if (Object.keys(haveCustomer).length == 0) {
-        //         canUpdate = false;
-        //     }
-        // }
-        // if (col == 'modelCode' && canUpdate == true) {
-        //     let haveModel = model.filter(item => item.model == val);
-        //     if (Object.keys(haveModel).length == 0) {
-        //         canUpdate = false;
-        //     }
-        // }
-        [...Array(31)].map((item, index) => {
-            let day = index + 1;
-            let colDay = `d${day.toLocaleString('en', { minimumIntegerDigits: 2 })}`;
-            let valOfDay = (typeof row[colDay] != 'undefined' && row[colDay]) ? parseInt(row[colDay]) : 0;
-            row[colDay] = valOfDay;
-        })
-        // if (canUpdate) {
-        //     const update = await API_UPDATE_ROW({
-        //         id: row.id,
-        //         column: col,
-        //         val: parseInt(val),
-        //         alforecast: row
-        //     });
-        //     console.log(update)
-        //     if(update?.status > 0){
-        //         row['id'] = update.id;
-        //     }
-        // }
-    }
+    // async function handleChange(val, iRow, col) {
+    //     let row = inputvalue.inputs[iRow];
+    //     row[col] = (col == 'customer' || col == 'modelCode' || col == 'plType' || col == 'sebango') ? val : parseInt(val);
+    //     row['ym'] = `${year}${month.toLocaleString('en', { minimumIntegerDigits: 2 })}`;
+    //     // let canUpdate = true;
+    //     // if (col == 'customer') {
+    //     //     let haveCustomer = customer.filter(item => item.customerNameShort == val);
+    //     //     if (Object.keys(haveCustomer).length == 0) {
+    //     //         canUpdate = false;
+    //     //     }
+    //     // }
+    //     // if (col == 'modelCode' && canUpdate == true) {
+    //     //     let haveModel = model.filter(item => item.model == val);
+    //     //     if (Object.keys(haveModel).length == 0) {
+    //     //         canUpdate = false;
+    //     //     }
+    //     // }
+    //     [...Array(31)].map((item, index) => {
+    //         let day = index + 1;
+    //         let colDay = `d${day.toLocaleString('en', { minimumIntegerDigits: 2 })}`;
+    //         let valOfDay = (typeof row[colDay] != 'undefined' && row[colDay]) ? parseInt(row[colDay]) : 0;
+    //         row[colDay] = valOfDay;
+    //     });
+    //     // if (canUpdate) {
+    //     //     const update = await API_UPDATE_ROW({
+    //     //         id: row.id,
+    //     //         column: col,
+    //     //         val: parseInt(val),
+    //     //         alforecast: row
+    //     //     });
+    //     //     console.log(update)
+    //     //     if(update?.status > 0){
+    //     //         row['id'] = update.id;
+    //     //     }
+    //     // }
+    // }
     const handleLogout = () => {
         if (confirm('คุณต้องการออกจากระบบใช่หรือไม่ ?')) {
             dispatch({ type: 'LOGIN', payload: { login: false } })
@@ -128,26 +130,27 @@ function SealForecase() {
                 index === i
                     ? {
                         ...item,
-                        [elm]: (elm != 'modelCode' && elm != 'pltype' && elm != 'customer' && elm != 'sebango') ? (e.target.value != '' ? parseInt(e.target.value) : '') : (elm == 'customer' ? e.target.value.toUpperCase() : e.target.value)
+                        [elm]: (elm != 'modelCode' && elm != 'pltype' && elm != 'customer' && elm != 'sebango') ? ((e.target.value != '' && e.target.value != '-') ? parseInt(e.target.value) : '') : (elm == 'customer' ? e.target.value.toUpperCase() : e.target.value)
                     }
                     : item
             )
         }));
     };
     async function init() {
-        setLoading(true);
-        await initialContent();
-        const resModel = await ServiceGetModels();
-        const resCustomer = await ServiceGetCustomers();
-        const resPltype = await ServiceGetPltype();
-        setcustomer(resCustomer);
-        setmodel(resModel);
-        setpltype(resPltype);
-        setLoading(false);
+        const dataExcel = await initialContent();
+        setExcel(dataExcel);
+        // setLoading(true);
+        // await initialContent();
+        // const resModel = await ServiceGetModels();
+        // const resCustomer = await ServiceGetCustomers();
+        // const resPltype = await ServiceGetPltype();
+        // setcustomer(resCustomer);
+        // setmodel(resModel);
+        // setpltype(resPltype);
+        // setLoading(false);
     }
     async function getData() {
         const res = await API_GET_SALE_OF_MONTH({ year: year, month: month });
-        console.log(res);
     }
 
     async function handleDeleteAll() {
@@ -163,45 +166,58 @@ function SealForecase() {
         }
     }
     const initialContent = async () => {
-        let rowCount = 0;
-        const saleforecase = await API_GET_SALE_OF_MONTH({
-            year: year,
-            month: month
-        });
-        rowCount = countRow;
-        if (saleforecase.length > 10 && rowCount < saleforecase.length) {
-            rowCount = saleforecase.length
-            setCountRow(rowCount)
-        }
-        setDays([]);
-        var initDays = [];
-        var i = 0;
-        var input = { inputs: [] };
-        while (i < rowCount) {
-            var colInput = {};
-            var a = moment(startDate);
-            var b = moment(endDate);
-            initDays = []
-            initDays.push('customer');
-            initDays.push('modelCode');
-            initDays.push('sebango')
-            initDays.push('pltype');
-            for (var m = moment(a); m <= b; m.add(1, 'days')) {
-                initDays.push('d' + m.format('DD'));
-            }
-            if (typeof saleforecase[i] !== 'undefined') {
-                colInput = saleforecase[i];
-            } else {
+        // const data = await API_GET_SALE({});
+        // console.log(data)
+        // setLoading(false);
+        // const schema = ['customer', 'modelCode', 'sebango', 'pltype'];
+        // const initData = await data.map((v, i) => {
+        //     let item = [];
+        //     schema.map((vSchema, iSchema) => {
+        //         item.push({ value: v[vSchema] })
+        //     });
+        //     return item
+        // });
+        // return initData;
+        // let rowCount = 0;
+        // const saleforecase = await API_GET_SALE_OF_MONTH({
+        //     year: year,
+        //     month: month
+        // });
+        // rowCount = countRow;
+        // if (saleforecase.length > 10 && rowCount < saleforecase.length) {
+        //     rowCount = saleforecase.length
+        //     setCountRow(rowCount)
+        // }
+        // console.log(rowCount)
+        // setDays([]);
+        // var initDays = [];
+        // var i = 0;
+        // var input = { inputs: [] };
+        // while (i < rowCount) {
+        //     var colInput = {};
+        //     var a = moment(startDate);
+        //     var b = moment(endDate);
+        //     initDays = []
+        //     initDays.push('customer');
+        //     initDays.push('modelCode');
+        //     initDays.push('sebango')
+        //     initDays.push('pltype');
+        //     for (var m = moment(a); m <= b; m.add(1, 'days')) {
+        //         initDays.push('d' + m.format('DD'));
+        //     }
+        //     if (typeof saleforecase[i] !== 'undefined') {
+        //         colInput = saleforecase[i];
+        //     } else {
 
-                if (typeof inputvalue.inputs != 'undefined' && i < inputvalue.inputs.length) {
-                    colInput = inputvalue.inputs[i]
-                }
-            }
-            input.inputs.push(colInput)
-            i++;
-        }
-        setinputvalue({ ...input })
-        setDays([...initDays]);
+        //         if (typeof inputvalue.inputs != 'undefined' && i < inputvalue.inputs.length) {
+        //             colInput = inputvalue.inputs[i]
+        //         }
+        //     }
+        //     input.inputs.push(colInput)
+        //     i++;
+        // }
+        // setinputvalue({ ...input })
+        // setDays([...initDays]);
     }
     const handleCheck = (obj, key, val) => {
         return (typeof val == 'undefined' || val == '' || obj.findIndex(el => el[key] == val) == -1) ? 1 : 0;
@@ -226,113 +242,113 @@ function SealForecase() {
             sebango: sebango
         };
     }
-    const handleSave = async () => {
-        var data = []
-        var empty = [];
-        var checkPltype = true;
-        setLoading(true);
-        inputvalue.inputs.map((item, index) => {
-            var row = inputvalue.inputs[index];
-            var errors = [];
-            let checkSebango = handleCheckSebango(model, 'modelCode', row['sebango'], row['modelCode']);
-            errors['customer'] = handleCheck(customer, 'customerNameShort', row['customer']);
-            errors['modelCode'] = handleCheck(model, 'model', row['modelCode']);
-            errors['pltype'] = handleCheck(pltype, 'pltype', row['pltype']);
-            errors['sebango'] = checkSebango.error;
-            inputvalue.inputs[index]['id'] = 0;
-            if (typeof inputvalue.inputs[index]['modelCode'] != 'undefined' && inputvalue.inputs[index]['modelCode'] != '') {
-                if (inputvalue.inputs[index]['pltype'] == '' || typeof inputvalue.inputs[index]['pltype'] == 'undefined') {
-                    setMessage('กรุณากรอกข้อมูล PLTYPE ')
-                    setOpenMsg(1);
-                    inputvalue.inputs[index]['warning'] = 1;
-                    checkPltype = false;
-                }
-                inputvalue.inputs[index]['sebango'] = checkSebango.sebango;
-                inputvalue.inputs[index]['modelCode'] = inputvalue.inputs[index]['modelCode'];
-                inputvalue.inputs[index]['modelName'] = inputvalue.inputs[index]['modelCode'];
-                inputvalue.inputs[index]['ym'] = yearSelected + '' + monthSelected;
-                inputvalue.inputs[index]['ym'] = `${yearSelected}${monthSelected.toLocaleString('en', { minimumIntegerDigits: 2, useGrouping: false })}`;
-                inputvalue.inputs[index]['lrev'] = '999';
-                inputvalue.inputs[index]['createBy'] = empcode.toString();
-                inputvalue.inputs[index]['customer'] = inputvalue.inputs[index]['customer'].toString();
-                inputvalue.inputs[index]['createDate'] = '2023-10-04T07:53:51.258Z';
-                inputvalue.inputs[index]['error'] = errors;
-                data.push(inputvalue.inputs[index])
-            } else {
-                inputvalue.inputs[index]['pltype'] = '';
-                inputvalue.inputs[index]['modelCode'] = '';
-                inputvalue.inputs[index]['modelName'] = '';
-                inputvalue.inputs[index]['ym'] = '';
-                inputvalue.inputs[index]['lrev'] = '';
-                inputvalue.inputs[index]['createBy'] = '';
-                inputvalue.inputs[index]['createDate'] = '';
-                inputvalue.inputs[index]['error'] = [];
-                Object.keys(inputvalue.inputs[index]).map((key) => {
-                    inputvalue.inputs[index][key] = '';
-                })
-                empty.push(inputvalue.inputs[index])
-            }
-        });
+    // const handleSave = async () => {
+    //     var data = []
+    //     var empty = [];
+    //     var checkPltype = true;
+    //     setLoading(true);
+    //     inputvalue.inputs.map((item, index) => {
+    //         var row = inputvalue.inputs[index];
+    //         var errors = [];
+    //         let checkSebango = handleCheckSebango(model, 'modelCode', row['sebango'], row['modelCode']);
+    //         errors['customer'] = handleCheck(customer, 'customerNameShort', row['customer']);
+    //         errors['modelCode'] = handleCheck(model, 'model', row['modelCode']);
+    //         errors['pltype'] = handleCheck(pltype, 'pltype', row['pltype']);
+    //         errors['sebango'] = checkSebango.error;
+    //         inputvalue.inputs[index]['id'] = 0;
+    //         if (typeof inputvalue.inputs[index]['modelCode'] != 'undefined' && inputvalue.inputs[index]['modelCode'] != '') {
+    //             if (inputvalue.inputs[index]['pltype'] == '' || typeof inputvalue.inputs[index]['pltype'] == 'undefined') {
+    //                 setMessage('กรุณากรอกข้อมูล PLTYPE ')
+    //                 setOpenMsg(1);
+    //                 inputvalue.inputs[index]['warning'] = 1;
+    //                 checkPltype = false;
+    //             }
+    //             inputvalue.inputs[index]['sebango'] = checkSebango.sebango;
+    //             inputvalue.inputs[index]['modelCode'] = inputvalue.inputs[index]['modelCode'];
+    //             inputvalue.inputs[index]['modelName'] = inputvalue.inputs[index]['modelCode'];
+    //             inputvalue.inputs[index]['ym'] = yearSelected + '' + monthSelected;
+    //             inputvalue.inputs[index]['ym'] = `${yearSelected}${monthSelected.toLocaleString('en', { minimumIntegerDigits: 2, useGrouping: false })}`;
+    //             inputvalue.inputs[index]['lrev'] = '999';
+    //             inputvalue.inputs[index]['createBy'] = empcode.toString();
+    //             inputvalue.inputs[index]['customer'] = inputvalue.inputs[index]['customer'].toString();
+    //             inputvalue.inputs[index]['createDate'] = '2023-10-04T07:53:51.258Z';
+    //             inputvalue.inputs[index]['error'] = errors;
+    //             data.push(inputvalue.inputs[index])
+    //         } else {
+    //             inputvalue.inputs[index]['pltype'] = '';
+    //             inputvalue.inputs[index]['modelCode'] = '';
+    //             inputvalue.inputs[index]['modelName'] = '';
+    //             inputvalue.inputs[index]['ym'] = '';
+    //             inputvalue.inputs[index]['lrev'] = '';
+    //             inputvalue.inputs[index]['createBy'] = '';
+    //             inputvalue.inputs[index]['createDate'] = '';
+    //             inputvalue.inputs[index]['error'] = [];
+    //             Object.keys(inputvalue.inputs[index]).map((key) => {
+    //                 inputvalue.inputs[index][key] = '';
+    //             })
+    //             empty.push(inputvalue.inputs[index])
+    //         }
+    //     });
 
-        var validate = true;
-        inputvalue.inputs.map((el, index) => {
-            if (Object.values(el.error).includes(1)) {
-                validate = false;
-            }
-        });
-        if (validate == false) {
-            setMessage('ข้อมูลของคุณยังไม่ถูกต้องตามที่ระบบต้องการ')
-            setOpenMsg(1);
-            setinputvalue({ ...inputvalue, inputs: [...data] })
-            setOpenSnackBarFalse({ ...openSnackBarFalse, msg: 'ข้อมูลของคุณยังไม่ถูกต้องตามที่ระบบต้องการ', status: true })
-            setLoading(false);
-        } else {
-            if (checkPltype != false) {
-                var canSave = true;
-                var indexRow = 0;
-                data.map((item, index) => {
-                    var i = 1;
-                    var warning = 0;
-                    while (i <= 31) {
-                        var key = `d` + i.toLocaleString('en', { minimumIntegerDigits: 2, useGrouping: false });
-                        item[key] = (item[key] != '' && typeof item[key] !== 'undefined') ? item[key] : 0;
-                        if (item[key] > 100000) {
-                            warning = 1;
-                            canSave = false;
-                            setMessage('ระบบไม่รองรับตัวเลขที่มากกว่า 6 ตำแหน่ง')
-                            setOpenMsg(1);
-                        }
-                        i++;
-                    }
-                    data[index]['row'] = indexRow;
-                    data[index]['warning'] = warning;
-                    indexRow++;
-                })
-                if (canSave) {
-                    console.log(data)
-                    // const save = await API_SAVE_SALE_FORCAST({ data: data, ym: `${year}${month.toLocaleString('en', { minimumIntegerDigits: 2 })}` });
-                    // console.log(save);
-                    // const save = await API_SAVE_SALE_FORCAST({ data: data, ym: `${yearSelected}${monthSelected.toLocaleString('en', { minimumIntegerDigits: 2 })}` }).then((res) => {
-                    //     return res
-                    // });
-                    // if (save.status || (save.status == false && data.length == 0)) {
-                    //     setMessage('บันทึกข้อมูลสำเร็จแล้ว ' + moment().format('DD/MM/YYYY HH:mm:ss'))
-                    //     setOpenMsg(2);
-                    //     setinputvalue({ ...inputvalue, inputs: [...data, ...empty] });
-                    //     setOpenSnackBar(true);
-                    // } else {
-                    //     setMessage('เกิดข้อผิดพลาดกับข้อมูล กรุณาติดต่อ IT (250,611) เบียร์ ' + moment().format('DD/MM/YYYY HH:mm:ss'))
-                    //     setOpenMsg(1);
-                    //     setOpenSnackBarFalse({ ...openSnackBarFalse, status: true, msg: 'เกิดข้อผิดพลาดกับข้อมูล กรุณาติดต่อ IT (250,611) เบียร์' })
-                    // }
-                    setLoading(false);
-                } else {
-                    setOpenSnackBar(true);
-                    setLoading(false);
-                }
-            }
-        }
-    }
+    //     var validate = true;
+    //     inputvalue.inputs.map((el, index) => {
+    //         if (Object.values(el.error).includes(1)) {
+    //             validate = false;
+    //         }
+    //     });
+    //     if (validate == false) {
+    //         setMessage('ข้อมูลของคุณยังไม่ถูกต้องตามที่ระบบต้องการ')
+    //         setOpenMsg(1);
+    //         setinputvalue({ ...inputvalue, inputs: [...data] })
+    //         setOpenSnackBarFalse({ ...openSnackBarFalse, msg: 'ข้อมูลของคุณยังไม่ถูกต้องตามที่ระบบต้องการ', status: true })
+    //         setLoading(false);
+    //     } else {
+    //         if (checkPltype != false) {
+    //             var canSave = true;
+    //             var indexRow = 0;
+    //             data.map((item, index) => {
+    //                 var i = 1;
+    //                 var warning = 0;
+    //                 while (i <= 31) {
+    //                     var key = `d` + i.toLocaleString('en', { minimumIntegerDigits: 2, useGrouping: false });
+    //                     item[key] = (item[key] != '' && typeof item[key] !== 'undefined') ? item[key] : 0;
+    //                     if (item[key] > 100000) {
+    //                         warning = 1;
+    //                         canSave = false;
+    //                         setMessage('ระบบไม่รองรับตัวเลขที่มากกว่า 6 ตำแหน่ง')
+    //                         setOpenMsg(1);
+    //                     }
+    //                     i++;
+    //                 }
+    //                 data[index]['row'] = indexRow;
+    //                 data[index]['warning'] = warning;
+    //                 indexRow++;
+    //             })
+    //             if (canSave) {
+    //                 console.log(data)
+    //                 const save = await API_SAVE_SALE_FORCAST({ listalforecast: data, ym: `${year}${month.toLocaleString('en', { minimumIntegerDigits: 2 })}` });
+    //                 console.log(save);
+    //                 // const save = await API_SAVE_SALE_FORCAST({ data: data, ym: `${yearSelected}${monthSelected.toLocaleString('en', { minimumIntegerDigits: 2 })}` }).then((res) => {
+    //                 //     return res
+    //                 // });
+    //                 // if (save.status || (save.status == false && data.length == 0)) {
+    //                 //     setMessage('บันทึกข้อมูลสำเร็จแล้ว ' + moment().format('DD/MM/YYYY HH:mm:ss'))
+    //                 //     setOpenMsg(2);
+    //                 //     setinputvalue({ ...inputvalue, inputs: [...data, ...empty] });
+    //                 //     setOpenSnackBar(true);
+    //                 // } else {
+    //                 //     setMessage('เกิดข้อผิดพลาดกับข้อมูล กรุณาติดต่อ IT (250,611) เบียร์ ' + moment().format('DD/MM/YYYY HH:mm:ss'))
+    //                 //     setOpenMsg(1);
+    //                 //     setOpenSnackBarFalse({ ...openSnackBarFalse, status: true, msg: 'เกิดข้อผิดพลาดกับข้อมูล กรุณาติดต่อ IT (250,611) เบียร์' })
+    //                 // }
+    //                 setLoading(false);
+    //             } else {
+    //                 setOpenSnackBar(true);
+    //                 setLoading(false);
+    //             }
+    //         }
+    //     }
+    // }
     const handleAddRow = () => {
         let count = parseInt(countRow) + parseInt(newRow);
         setCountRow(count);
@@ -350,93 +366,33 @@ function SealForecase() {
         return (typeof data != 'undefined' && typeof data[index] != 'undefined' && data[index] == 1) ? 'bg-red-300' : '';
     }
     useEffect(() => {
-        if (change) {
-            setTimeout(() => {
-                // handleSave();
-                handleUpdate();
-                setChange(false);
-            }, 1500);
-        } else {
-            init();
-        }
-        return;
-    }, [change,countRow]);
+        // if (change) {
+        //     setTimeout(() => {
+        //         // handleSave();
+        //         handleUpdate();
+        //         setChange(false);
+        //     }, 1500);
+        // } else {
+        //     init();
+        // }
+        // init();
+        // return;
+    }, [excel]);
     return (
-        <div className="h-full w-full">
-            <div className="h-[88%] p-3 bg-[#dbe2ed]">
-                <Paper className="h-[100%]">
+        <div className="h-[92.5%]">
+            <div className="h-full p-3 bg-[#dbe2ed]">
+               
+                <ExcelPanel dataExcel={excel} />
+                {/* <Paper className="h-[100%]">
                     <Stack direction={'row'} p={2} justifyContent={'space-between'}>
                         <Stack direction={'row'}>
                             <Stack direction={'row'} alignItems={'center'} gap={2}>
-                                {/* <Stack direction={'row'} alignItems={'center'} gap={1}>
-                                    <FilterListIcon style={{ color: '#65a0f5' }} />
-                                    <span>Filter</span>
-                                </Stack> */}
                                 <Stack direction={'row'}>
                                     <Typography>YEAR : {year}</Typography>
                                 </Stack>
                                 <Stack direction={'row'}>
                                     <Typography>MONTH : {moment().month(month - 1).format('MMM').toUpperCase()}</Typography>
                                 </Stack>
-
-                                {/* <Stack direction={'row'} alignItems={'center'} gap={1}> */}
-                                {/* <Typography>Month : </Typography> */}
-                                {/* <Select size="small" value={monthSelected} onChange={(e) => {
-                                        let month = e.target.value;
-                                        month = parseInt(month) >= 10 ? month : `0${month}`;
-                                        dispatch({
-                                            type: 'SET_FILTER', payload: {
-                                                filter: {
-                                                    year: yearSelected,
-                                                    month: month
-                                                }
-                                            }
-                                        })
-                                        setStartDate(`${yearSelected}${month}01`);
-                                        setEndDate(`${yearSelected}${month}${moment(`${yearSelected}${month}`, 'YYYYMM').daysInMonth()}`);
-                                        handleClear();
-                                        setMonthSelected(e.target.value)
-                                    }}>
-                                        {
-                                            monthNames.map((month, index) => (
-                                                <MenuItem value={(index + 1)} key={(index + 1)}>{month}</MenuItem>
-                                            ))
-                                        }
-                                    </Select> */}
-                                {/* </Stack> */}
-                                {/* <Stack direction={'row'} alignItems={'center'} gap={1}>
-                                    <Typography>Year : </Typography>
-                                    <Select size="small" value={yearSelected} onChange={(e) => {
-                                        dispatch({
-                                            type: 'SET_FILTER', payload: {
-                                                filter: {
-                                                    year: e.target.value,
-                                                    month: monthSelected
-                                                }
-                                            }
-                                        })
-                                        handleClear();
-                                        setYearSelected(e.target.value)
-                                    }}>
-                                        {
-                                            [...Array(3)].map((year, index) => {
-                                                return <MenuItem value={parseInt(yearNow) + index} key={index}>{parseInt(yearNow) + index}</MenuItem>
-                                            })
-                                        }
-                                    </Select>
-                                </Stack> */}
-                                {/* <Stack direction={'row'} alignItems={'center'} gap={1}>
-                                    <Typography>SVU : </Typography>
-                                    <Select size="small" value={svuSelected} onChange={(e) => {
-                                        setSvuSelected(e.target.value)
-                                    }}>
-                                        {
-                                            svus.map((item, index) => {
-                                                return <MenuItem value={item} key={index}>{item}</MenuItem>
-                                            })
-                                        }
-                                    </Select>
-                                </Stack> */}
                             </Stack>
                         </Stack>
                         <Stack direction={'row'} alignItems={'center'} gap={1}>
@@ -453,7 +409,6 @@ function SealForecase() {
                         </Card>
                         <Card className="pl-3 pr-6 py-3 h-[65px] flex items-center" >
                             <Stack direction={'row'} gap={2}>
-                                {/* <Button variant='contained' startIcon={<TaskAltIcon />} > แก้ไข</Button> */}
                                 <Button variant='contained' color="success" onClick={() => handleSave()} startIcon={<TaskAltIcon />} > แจกจ่าย</Button>
                             </Stack>
                         </Card>
@@ -507,16 +462,18 @@ function SealForecase() {
                                                                 >
                                                                     <input
                                                                         size="small"
+                                                                        lang="en"
                                                                         onInput={(e) => {
                                                                             handlePasteRun(index, elm, e, i);
                                                                         }}
                                                                         onPaste={(e) => {
+                                                                            console.log(e.target.value)
                                                                             handlePaste(index, elm, e, i);
                                                                         }}
                                                                         onChange={(e) => {
                                                                             handleChange(e.target.value, index, elm)
                                                                         }}
-                                                                        type={`${(elm == 'customer' || elm == 'modelCode' || elm == 'pltype' || elm == 'sebango') ? 'text' : 'number'}`}
+                                                                        type={`${(elm == 'customer' || elm == 'modelCode' || elm == 'pltype' || elm == 'sebango') ? 'text' : 'text'}`}
                                                                         value={res[elm]}
                                                                         disabled={elm == 'sebango' ? true : false}
                                                                         className={`w-full  ${checkAlert(res.error, elm)} ${res?.warning == 1 && 'bg-[#f8717145]'} ${elm == 'sebango' ? 'inpSebango' : ''}`}
@@ -530,7 +487,7 @@ function SealForecase() {
                             </tbody>
                         </table>
                     </div>
-                </Paper>
+                </Paper> */}
             </div >
             <Backdrop
                 className="select-none"
